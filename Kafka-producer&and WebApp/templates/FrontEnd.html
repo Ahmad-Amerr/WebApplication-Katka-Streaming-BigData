@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tweet Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h2>Top Users by Tweet Count</h2>
+    <canvas id="userChart"></canvas>
+
+    <div>
+        <input type="text" id="wordQuery" placeholder="Enter a word">
+        <button onclick="updateTrendChart()">Show Trends</button>
+    </div>
+    <h2>Tweet Trends by Date</h2>
+    <canvas id="trendChart"></canvas>
+    <script>
+        let userChart;
+        let trendChart;
+        async function fetchTopUsers() {
+            const response = await fetch('/top_users');
+            const data = await response.json();
+            return data.users.map(user => ({ label: user._id, value: user.count }));
+        }
+ async function createTopUsersChart() {
+        const userData = await fetchTopUsers();
+        const ctx = document.getElementById('userChart').getContext('2d');
+        if (userChart) {
+            userChart.destroy();
+        }
+        userChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: userData.map(user => user.label),
+                datasets: [{
+                    label: 'Number of Tweets',
+                    data: userData.map(user => user.value),
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+
+    async function fetchTrendData(word) {
+    try {
+        const response = await fetch(`/tweet_trends?word=${word}`);
+        const data = await response.json();
+        if (data.error) {
+            console.error("Error from server:", data.error);
+        }
+        return data.WordsperDay ? data.WordsperDay.map(word => ({ label: word._id, value: word.count })) : [];
+    } catch (error) {
+        console.error("Error fetching trend data:", error);
+    }
+}
+
+function mapDayNumberToName(dayNumber) {
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    return days[(dayNumber - 1) % 7];
+}
+
+async function updateTrendChart() {
+    const wordQuery = document.getElementById('wordQuery').value;
+    const trendData = await fetchTrendData(wordQuery);
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    if (trendChart) {
+        trendChart.destroy();
+    }
+    trendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: trendData.map(trend => mapDayNumberToName(trend.label)),
+            datasets: [{
+                label: `Number of Tweets mentioning '${wordQuery}'`,
+                data: trendData.map(trend => trend.value),
+                backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                borderColor: 'rgba(255, 159, 64, 1)',
+                borderWidth: 1,
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+        function refreshDashboard() {
+            createTopUsersChart();
+            const wordQuery = document.getElementById('wordQuery').value;
+            if (wordQuery) {
+                updateTrendChart();
+            }
+        }
+
+        setInterval(refreshDashboard, 30000); // Refresh every 30 seconds
+
+        window.onload = () => {
+            createTopUsersChart();
+        };
+    </script>
+</body>
+</html>
